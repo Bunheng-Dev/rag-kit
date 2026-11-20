@@ -1,0 +1,18 @@
+# Python & Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Vector Database Leftovers
+chroma_data/
+*.sqlite3
+
+# Git & Env
+.git/
+.env
+.env.*
+!.env.example

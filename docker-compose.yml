@@ -1,0 +1,44 @@
+services:
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-kit-api
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-9000}:9000"
+    env_file:
+      - .env
+    networks:
+      - rag-kit-network
+
+  cloudflared:
+    profiles: ["cloud"]
+    image: cloudflare/cloudflared:latest
+    container_name: rag-kit-tunnel
+    restart: unless-stopped
+    environment:
+      TUNNEL_TRANSPORT_PROTOCOL: http2
+    command: tunnel run --token ${CLOUDFLARE_TOKEN:-}
+    networks:
+      - rag-kit-network
+
+  qdrant:
+    profiles: ["selfhost"]
+    image: qdrant/qdrant:latest
+    container_name: rag-kit-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - rag-kit-network
+
+networks:
+  rag-kit-network:
+    driver: bridge
+
+volumes:
+  qdrant_data:
