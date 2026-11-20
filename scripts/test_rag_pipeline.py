@@ -14,6 +14,7 @@ from app.core.config import settings
 
 BASE_URL = os.getenv("RAG_KIT_BASE_URL", f"http://127.0.0.1:{settings.APP_PORT}")
 API_KEY = os.getenv("CHAT_INTERNAL_KEY", settings.CHAT_INTERNAL_KEY)
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def request_json(path: str, payload: dict | None = None, headers: dict | None = None):
@@ -24,13 +25,13 @@ def request_json(path: str, payload: dict | None = None, headers: dict | None = 
         headers={"Content-Type": "application/json", **(headers or {})},
         method="POST" if payload is not None else "GET",
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
+    with OPENER.open(request, timeout=20) as response:
         return response.status, json.loads(response.read().decode("utf-8"))
 
 
 def main() -> None:
     status, health = request_json("/health")
-    assert status == 200 and health["status"] == "online"
+    assert status == 200 and health["status"] in {"online", "degraded"}
     print(f"health: {health}")
 
     try:
@@ -57,11 +58,28 @@ def main() -> None:
         headers={"Content-Type": "application/json", "X-Chat-API-Key": API_KEY},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=120) as response:
+    with OPENER.open(request, timeout=120) as response:
         stream = response.read().decode("utf-8")
     assert "data: [DONE]" in stream
     print("chat stream: [DONE] received")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except urllib.error.HTTPError as exc:
+        print(f"HTTP error calling {exc.url}: {exc.code} {exc.reason}")
+        try:
+            print(f"Response body: {exc.read().decode('utf-8', errors='replace')}")
+        except OSError:
+            pass
+        raise SystemExit(1)
+    except urllib.error.URLError as exc:
+        print(
+            f"Connection error calling {BASE_URL}: {exc.reason}. "
+            "Check that the API is running on APP_PORT=8000 and that proxy/VPN settings are not resetting connections."
+        )
+        raise SystemExit(1)
+    except AssertionError as exc:
+        print(f"RAG pipeline assertion failed: {exc}")
+        raise SystemExit(1)

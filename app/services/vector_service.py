@@ -6,10 +6,16 @@ from app.providers.vectordb.base import VectorDBProvider
 
 class VectorStoreService:
     def __init__(self, provider: VectorDBProvider | None = None) -> None:
-        self._provider = provider or get_vector_db_provider()
+        self._provider = provider
+
+    @property
+    def provider(self) -> VectorDBProvider:
+        if self._provider is None:
+            self._provider = get_vector_db_provider()
+        return self._provider
 
     def __getattr__(self, name: str):
-        return getattr(self._provider, name)
+        return getattr(self.provider, name)
 
 
 vector_service = VectorStoreService()

@@ -40,11 +40,15 @@ def get_vector_db_provider() -> VectorDBProvider:
 
 @lru_cache(maxsize=1)
 def get_datasource_provider() -> DataSourceProvider:
+    if settings.DATASOURCE == "file":
+        from .datasource.file import FileDataSourceProvider
+
+        return FileDataSourceProvider()
     if settings.DATASOURCE == "mysql":
         from .datasource.mysql import MySQLDataSourceProvider
 
         return MySQLDataSourceProvider()
-    raise _unsupported("data source", settings.DATASOURCE, ("mysql",))
+    raise _unsupported("data source", settings.DATASOURCE, ("file", "mysql"))
 
 
 # Short aliases keep the factory convenient for scripts and integrations.

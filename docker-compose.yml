@@ -6,7 +6,7 @@ services:
     container_name: rag-kit-api
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-9000}:9000"
+      - "${APP_PORT:-8000}:8000"
     env_file:
       - .env
     networks:

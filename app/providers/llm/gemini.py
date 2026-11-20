@@ -1,4 +1,3 @@
-import re
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 
@@ -36,8 +35,9 @@ class GeminiLLMProvider(LLMProvider):
         self.prompt_template = _load_prompt_template()
 
     @staticmethod
-    def _language(text: str) -> str:
-        return "Khmer" if re.search(r"[\u1780-\u17FF]", text) else "English"
+    def _response_language() -> str:
+        configured = settings.RESPONSE_LANGUAGE.strip()
+        return "the same language as the user's question" if not configured or configured.lower() == "auto" else configured
 
     async def stream_response(
         self,
@@ -47,7 +47,7 @@ class GeminiLLMProvider(LLMProvider):
         context = "\n---\n".join(retrieved_chunks) if retrieved_chunks else "No specific context available."
         prompt = self.prompt_template.format(context=context)
         prompt += (
-            f"\n\nTarget Language: {self._language(user_query)}."
+            f"\n\nTarget Language: {self._response_language()}."
             " Respond strictly in that language."
             f"\nUser Question: {user_query}\nAnswer:"
         )

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "rag-kit"
     APP_VERSION: str = "1.0.0"
     APP_HOST: str = "0.0.0.0"
-    APP_PORT: int = Field(default=9000, validation_alias=AliasChoices("APP_PORT", "PORT"))
+    APP_PORT: int = Field(default=8000, validation_alias=AliasChoices("APP_PORT", "PORT"))
     DEBUG: bool = False
 
     LLM_PROVIDER: str = "gemini"
@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     EMBEDDING_PROVIDER: str = "gemini"
     EMBEDDING_MODEL: str = "gemini-embedding-001"
     EMBEDDING_DIM: int = 768
+    RESPONSE_LANGUAGE: str = "auto"
 
     VECTOR_DB: str = "qdrant"
     QDRANT_URL: str = "http://qdrant:6333"
@@ -44,8 +45,16 @@ class Settings(BaseSettings):
     MYSQL_PASSWORD: str = ""
     MYSQL_DATABASE: str = "rag_kit"
     MYSQL_CONNECT_TIMEOUT: int = 5
+    MYSQL_DOCUMENT_TABLE: str = "documents"
+    MYSQL_DOCUMENT_ID_COLUMN: str = "id"
+    MYSQL_DOCUMENT_TEXT_COLUMN: str = "text"
+    MYSQL_DOCUMENT_METADATA_COLUMNS: str = ""
+    SAMPLE_DATA_PATH: str = "data/sample.json"
 
     CHAT_INTERNAL_KEY: str = ""
+    ENABLE_CARDS: bool = False
+    RETRIEVAL_TOP_K: int = 6
+    CARD_MAX_ITEMS: int = 5
     PROMPT_TEMPLATE_PATH: str = "prompts/system.txt"
     PROMPT_TEMPLATE: str = ""
     MEDIA_BASE_URL: str = Field(

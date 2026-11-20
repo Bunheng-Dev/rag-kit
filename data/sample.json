@@ -1,0 +1,28 @@
+[
+  {
+    "id": "product-1",
+    "text": "Example product with three rooms, breakfast, Wi-Fi, and a swimming pool. Prices start at 120 USD per night.",
+    "metadata": {
+      "entity_type": "product",
+      "category": "lodging",
+      "price": 120
+    }
+  },
+  {
+    "id": "service-1",
+    "text": "Example guided service lasting one full day. It starts at 05:00 and includes private transportation and a professional guide.",
+    "metadata": {
+      "entity_type": "service",
+      "category": "experience",
+      "duration_hours": 8
+    }
+  },
+  {
+    "id": "faq-1",
+    "text": "Example FAQ: Customers can review opening hours, accessibility information, available payment methods, and cancellation terms before booking.",
+    "metadata": {
+      "entity_type": "faq",
+      "category": "support"
+    }
+  }
+]
