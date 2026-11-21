@@ -32,7 +32,97 @@ copy .env.example .env       # Windows
 # cp .env.example .env       # Linux/macOS
 ```
 
-Set the four required values in `.env`: `CHAT_INTERNAL_KEY`, `GEMINI_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY`. The example defaults to `DATASOURCE=file`, so MySQL is not needed for the bundled sample dataset. Never commit `.env`.
+Set `GEMINI_API_KEY` and `CHAT_INTERNAL_KEY` in `.env`. `QDRANT_URL` and `QDRANT_API_KEY` depend on whether you use self-hosted or cloud Qdrant. The example defaults to `DATASOURCE=file`, so MySQL is not needed for the bundled sample dataset. Never commit `.env`.
+
+## Quickstart (Docker + JSON sample)
+
+This is the shortest path to a local API using the bundled `data/sample.json` dataset and self-hosted Qdrant.
+
+### Bash
+
+```bash
+cp .env.example .env
+openssl rand -hex 32
+```
+
+Copy the generated value into `CHAT_INTERNAL_KEY` in `.env`, set `GEMINI_API_KEY` to your Gemini key, and set:
+
+```dotenv
+QDRANT_URL=http://qdrant:6333
+QDRANT_API_KEY=
+DATASOURCE=file
+```
+
+Start the API and Qdrant:
+
+```bash
+docker compose --profile selfhost up --build
+```
+
+Wait about 10–20 seconds, then check readiness:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"online","service":"rag-kit","vector_database":"qdrant","vector_database_status":"ready","collection":"rag_documents","embedding_dimension":768}
+```
+
+Load the JSON sample:
+
+```bash
+docker compose exec fastapi python scripts/ingest_sample.py
+```
+
+Call chat using the same key written to `.env`:
+
+```bash
+CHAT_INTERNAL_KEY="<same value as .env>"
+curl -N http://localhost:8000/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -H "X-Chat-API-Key: $CHAT_INTERNAL_KEY" \
+  -d '{"message":"What information is available?"}'
+```
+
+### PowerShell
+
+```powershell
+Copy-Item .env.example .env
+$bytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+[Convert]::ToHexString($bytes)
+```
+
+Copy the generated value into `CHAT_INTERNAL_KEY` in `.env`, set `GEMINI_API_KEY`, and set `QDRANT_URL=http://qdrant:6333`, `QDRANT_API_KEY=`, and `DATASOURCE=file`. Then run:
+
+```powershell
+docker compose --profile selfhost up --build
+Invoke-RestMethod http://localhost:8000/health | ConvertTo-Json -Compress
+docker compose exec fastapi python scripts/ingest_sample.py
+$headers = @{ "X-Chat-API-Key" = "<same value as .env>" }
+$body = @{ message = "What information is available?" } | ConvertTo-Json
+Invoke-WebRequest http://localhost:8000/api/v1/chat/stream -Method Post -Headers $headers -ContentType "application/json" -Body $body
+```
+
+If the API starts before Qdrant is ready, wait a few seconds and re-run the ingest command.
+
+## Local Qdrant for Python mode
+
+When running the API and ingestion scripts directly from Python, start Qdrant separately and use the host URL:
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+Set this in `.env`:
+
+```dotenv
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+```
 
 ### Cloud services
 
@@ -112,13 +202,31 @@ QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=rag_documents
 ```
 
+The code defaults `DATASOURCE` to `mysql`, while `.env.example` sets it to `file`; set it explicitly for the source you intend to use.
+
+For a minimal local table, run:
+
+```sql
+CREATE TABLE documents (
+    id INT PRIMARY KEY,
+    text TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    price INT NULL
+);
+
+INSERT INTO documents (id, text, category, price)
+VALUES (1, 'Example document for rag-kit.', 'example', NULL);
+```
+
+The complete three-row example is in [data/mysql_seed.sql](data/mysql_seed.sql).
+
 Run the synchronizer manually:
 
 ```bash
 python scripts/sync_mysql_to_qdrant.py
 ```
 
-Use `--dry-run` with `--prune` first to preview deletion candidates. It reads the current MySQL rows and scoped Qdrant IDs, but does not embed, upsert, or delete:
+On a fresh Qdrant collection, run a normal sync once before `--prune --dry-run` so the collection and initial points exist. Then preview deletion candidates; this reads the current MySQL rows and scoped Qdrant IDs, but does not embed, upsert, or delete:
 
 ```bash
 python scripts/sync_mysql_to_qdrant.py --prune --dry-run
@@ -278,7 +386,7 @@ The current API is served under `/api/v1`. Breaking changes will use `/api/v2`; 
 | `PROMPT_TEMPLATE_PATH` | `prompts/system.txt` | Prompt file path |
 | `PROMPT_TEMPLATE` | empty | Inline prompt override; `{context}` is replaced |
 | `MEDIA_BASE_URL` | empty | Optional media base URL |
-| `CARD_URL_TEMPLATE` | `/items/{slug}?id={id}` | Optional result-card URL template |
+| `CARD_URL_TEMPLATE` | `{base_url}/items/{slug}?id={id}` | Optional result-card URL template |
 | `CLOUDFLARE_TOKEN` | empty | Optional tunnel token for the cloud profile |
 
 ## Adding a provider
