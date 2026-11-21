@@ -17,6 +17,8 @@ from .base import VectorDBProvider
 
 
 class QdrantVectorDBProvider(VectorDBProvider):
+    SCROLL_PAGE_SIZE = 100
+
     def __init__(self) -> None:
         self.client = QdrantClient(
             url=settings.QDRANT_URL,
@@ -49,10 +51,23 @@ class QdrantVectorDBProvider(VectorDBProvider):
             field_name="entity_type",
             field_schema=PayloadSchemaType.KEYWORD,
         )
+        self.client.create_payload_index(
+            collection_name=self.collection_name,
+            field_name="sync_source",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
 
     @staticmethod
     def point_id(document_id: str | int) -> str:
         return str(uuid5(NAMESPACE_URL, f"{settings.QDRANT_COLLECTION}:{document_id}"))
+
+    @staticmethod
+    def _filter(where: Mapping[str, object] | None = None) -> Filter | None:
+        if not where:
+            return None
+        return Filter(
+            must=[FieldCondition(key=key, match=MatchValue(value=value)) for key, value in where.items()]
+        )
 
     def query(
         self,
@@ -62,11 +77,7 @@ class QdrantVectorDBProvider(VectorDBProvider):
     ) -> dict[str, list[list[dict | str]]]:
         if len(query_vector) != settings.EMBEDDING_DIM:
             raise ValueError(f"Query vector must have {settings.EMBEDDING_DIM} dimensions")
-        query_filter = None
-        if where:
-            query_filter = Filter(
-                must=[FieldCondition(key=key, match=MatchValue(value=value)) for key, value in where.items()]
-            )
+        query_filter = self._filter(where)
         response = self.client.query_points(
             collection_name=self.collection_name,
             query=list(query_vector),
@@ -117,7 +128,27 @@ class QdrantVectorDBProvider(VectorDBProvider):
 
     def delete_documents(self, ids: Sequence[str | int]) -> None:
         if ids:
+            self.delete_points([self.point_id(document_id) for document_id in ids])
+
+    def list_point_ids(self, where: Mapping[str, object] | None = None) -> list[str]:
+        point_ids: list[str] = []
+        offset = None
+        while True:
+            points, offset = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=self._filter(where),
+                limit=self.SCROLL_PAGE_SIZE,
+                offset=offset,
+                with_payload=False,
+                with_vectors=False,
+            )
+            point_ids.extend(str(point.id) for point in points)
+            if offset is None:
+                return point_ids
+
+    def delete_points(self, point_ids: Sequence[str | int]) -> None:
+        if point_ids:
             self.client.delete(
                 collection_name=self.collection_name,
-                points_selector=[self.point_id(document_id) for document_id in ids],
+                points_selector=list(point_ids),
             )
