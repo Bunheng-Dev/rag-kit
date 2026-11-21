@@ -4,6 +4,7 @@ The source table and columns are configured through environment variables so
 this script does not assume a particular application schema.
 """
 
+import argparse
 import os
 import re
 import sys
@@ -87,22 +88,52 @@ def sync_documents(documents: list[tuple[str, str, dict[str, Any]]]) -> None:
         print(f"Synced {start + len(batch)}/{len(documents)} documents.")
 
 
-def main() -> None:
-    if settings.DATASOURCE != "mysql":
-        raise RuntimeError("MySQL synchronization requires DATASOURCE=mysql")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="read and validate source rows without embedding or writing vectors",
+    )
+    args = parser.parse_args(argv)
 
-    connection = get_db_connection()
     try:
-        documents = load_documents(connection)
-    finally:
-        connection.close()
+        if settings.DATASOURCE != "mysql":
+            raise RuntimeError("MySQL synchronization requires DATASOURCE=mysql")
 
-    if not documents:
-        print("No non-empty documents found; nothing to sync.")
-        return
-    sync_documents(documents)
-    print(f"Synchronized {len(documents)} documents into '{settings.QDRANT_COLLECTION}'.")
+        connection = get_db_connection()
+        try:
+            documents = load_documents(connection)
+        finally:
+            connection.close()
+
+        if args.dry_run:
+            print(f"Dry run: {len(documents)} documents would be synced from '{settings.MYSQL_DOCUMENT_TABLE}'.")
+            return 0
+        if not documents:
+            print("No non-empty documents found; nothing to sync.")
+            return 0
+        sync_documents(documents)
+        print(f"Synchronized {len(documents)} documents into '{settings.QDRANT_COLLECTION}'.")
+        return 0
+    except pymysql.err.OperationalError:
+        print(
+            "ERROR: MySQL connection failed. Check MYSQL_HOST, MYSQL_PORT, "
+            "MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE.",
+            file=sys.stderr,
+        )
+    except pymysql.err.ProgrammingError:
+        print(
+            "ERROR: MySQL query failed. Check MYSQL_DOCUMENT_TABLE, "
+            "MYSQL_DOCUMENT_ID_COLUMN, MYSQL_DOCUMENT_TEXT_COLUMN, and metadata columns.",
+            file=sys.stderr,
+        )
+    except ValueError as exc:
+        print(f"ERROR: invalid configuration: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"ERROR: synchronization failed ({type(exc).__name__}).", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -87,6 +87,85 @@ $env:DATASOURCE = "file"
 python scripts/ingest_sample.py
 ```
 
+## MySQL quick start
+
+The generic MySQL synchronizer expects one table or view with a document ID and text column. Configure these variables in `.env`:
+
+```dotenv
+DATASOURCE=mysql
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3307
+MYSQL_USER=rag_kit
+MYSQL_PASSWORD=rag_kit_pw
+MYSQL_DATABASE=rag_kit
+MYSQL_DOCUMENT_TABLE=documents
+MYSQL_DOCUMENT_ID_COLUMN=id
+MYSQL_DOCUMENT_TEXT_COLUMN=text
+MYSQL_DOCUMENT_METADATA_COLUMNS=category,price
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=rag_documents
+```
+
+Run the synchronizer manually:
+
+```bash
+python scripts/sync_mysql_to_qdrant.py
+```
+
+Use `--dry-run` to validate the source and report the number of non-empty rows without embedding or writing vectors:
+
+```bash
+python scripts/sync_mysql_to_qdrant.py --dry-run
+```
+
+For a real local integration test, start the disposable MySQL and self-hosted Qdrant services, then run the opt-in harness:
+
+MySQL integration test needs local Qdrant: `docker compose --profile selfhost up -d qdrant`
+
+```bash
+docker compose --profile mysql-test --profile selfhost up -d
+python scripts/test_mysql_sync.py
+```
+
+The test uses MySQL host port `3307`, seeds `data/mysql_seed.sql`, syncs into `rag_kit_mysql_test`, checks payloads and the chat endpoint, verifies a second sync does not duplicate points, and drops the test collection. It is not part of the default `pytest` or CI run.
+
+To schedule a sync hourly with cron:
+
+```cron
+0 * * * * cd /opt/rag-kit && /opt/rag-kit/.venv/bin/python scripts/sync_mysql_to_qdrant.py >> /var/log/rag-kit-sync.log 2>&1
+```
+
+## Using multiple tables
+
+Create a view that normalizes multiple sources into one document shape, then point the synchronizer at the view:
+
+```sql
+CREATE VIEW rag_documents AS
+SELECT id, title AS text, 'catalog' AS category, price
+FROM catalog_items
+UNION ALL
+SELECT id + 1000000, description AS text, 'support' AS category, NULL AS price
+FROM support_articles;
+```
+
+Configure `MYSQL_DOCUMENT_TABLE=rag_documents`, `MYSQL_DOCUMENT_ID_COLUMN=id`, `MYSQL_DOCUMENT_TEXT_COLUMN=text`, and `MYSQL_DOCUMENT_METADATA_COLUMNS=category,price`.
+
+## Limitations
+
+- Synchronization is manual or externally scheduled; there is no automatic change feed.
+- Each table or view contributes one configured text column per row.
+- Only Gemini LLM/embedding and Qdrant vector providers are currently implemented; MySQL and file are datasource providers.
+- There is no frontend application in this repository.
+- Changing `EMBEDDING_MODEL` or `EMBEDDING_DIM` requires a new compatible collection and full re-ingestion.
+- Deleted MySQL rows are not automatically removed from Qdrant. Run a project-specific reconciliation/deletion job when source deletions must be reflected.
+
+## Production checklist
+
+- Put the API behind an HTTPS reverse proxy.
+- Restrict `CORS_ALLOW_ORIGINS` to trusted origins instead of `*`.
+- Use a strong, rotated `CHAT_INTERNAL_KEY`.
+- Run the API and scheduled synchronizer as managed services with log rotation and restart policies.
+
 ## API
 
 - `GET /health` returns `online` when Qdrant is ready and `degraded` when startup cannot reach it.
