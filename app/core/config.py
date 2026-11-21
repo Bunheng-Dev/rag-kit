@@ -1,10 +1,13 @@
 from pathlib import Path
+from typing import Annotated
+import logging
 
 from pydantic import AliasChoices, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -67,7 +70,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MEDIA_BASE_URL", "UPLOAD_BASE_URL"),
     )
     CARD_URL_TEMPLATE: str = "{base_url}/items/{slug}?id={id}"
-    CORS_ALLOW_ORIGINS: str = "*"
+    CORS_ALLOW_ORIGINS: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     @field_validator(
         "LLM_PROVIDER",
@@ -95,6 +98,23 @@ class Settings(BaseSettings):
             raise ValueError("SECRET_SCAN_MODE must be block, redact, or off")
         return mode
 
+    @field_validator("CORS_ALLOW_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: str | list[str] | None) -> list[str]:
+        if value is None:
+            origins: list[str] = []
+        elif isinstance(value, str):
+            origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        else:
+            origins = [str(origin).strip() for origin in value if str(origin).strip()]
+
+        if "*" in origins:
+            logger.warning(
+                "CORS_ALLOW_ORIGINS includes '*'; wildcard CORS is insecure for production "
+                "and credentialed CORS will be disabled."
+            )
+        return origins
+
     @property
     def secret_scan_blocked_columns(self) -> set[str]:
         return {column.strip().lower() for column in self.SECRET_SCAN_BLOCKED_COLUMNS.split(",") if column.strip()}
@@ -106,9 +126,11 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        if self.CORS_ALLOW_ORIGINS.strip() == "*":
-            return ["*"]
-        return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]
+        return list(self.CORS_ALLOW_ORIGINS)
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        return "*" not in self.CORS_ALLOW_ORIGINS
 
 
 settings = Settings()

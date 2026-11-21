@@ -164,9 +164,13 @@ FROM support_articles;
 
 Configure `MYSQL_DOCUMENT_TABLE=rag_documents`, `MYSQL_DOCUMENT_ID_COLUMN=id`, `MYSQL_DOCUMENT_TEXT_COLUMN=text`, and `MYSQL_DOCUMENT_METADATA_COLUMNS=category,price`.
 
+## Breaking changes in v0.2.0
+
+- CORS now allows no cross-origin requests by default. Set `CORS_ALLOW_ORIGINS` to a comma-separated list of trusted frontend origins. The legacy `*` value remains supported, but logs a startup warning and disables credentialed CORS.
+
 ## Security notes
 
-> **Warning**: `CORS_ALLOW_ORIGINS` defaults to permissive access. Developers **MUST** set it to their own frontend domain or domains before production.
+> **Warning**: `CORS_ALLOW_ORIGINS=*` is insecure for production. Use explicit trusted frontend origins instead.
 
 - Keep `.env` out of Git and use a strong, rotated `CHAT_INTERNAL_KEY`.
 - Put the API behind HTTPS, use a read-only MySQL account, and keep Qdrant private and authenticated.
@@ -195,6 +199,7 @@ Detection combines provider-key patterns, credential formats, and a high-entropy
 > **Known limitations**: Review these before using rag-kit in production.
 
 - v0.1.0 MySQL points without the `sync_source` payload marker are not eligible for pruning until they are re-synced.
+- Wildcard CORS remains available for development compatibility, but it cannot be combined with credentialed CORS and should not be used in production.
 - Changing `EMBEDDING_MODEL` or `EMBEDDING_DIM` requires a new collection and full re-ingestion.
 - Synchronization is manual or externally scheduled; there is no automatic sync.
 - Each table or view contributes one configured text column per row.
@@ -206,7 +211,7 @@ Detection combines provider-key patterns, credential formats, and a high-entropy
 ## Production checklist
 
 - Put the API behind an HTTPS reverse proxy.
-- Restrict `CORS_ALLOW_ORIGINS` to trusted origins instead of `*`.
+- Restrict `CORS_ALLOW_ORIGINS` to trusted origins; do not use `*` in production.
 - Use a strong, rotated `CHAT_INTERNAL_KEY`.
 - Run the API and scheduled synchronizer as managed services with log rotation and restart policies.
 
@@ -244,7 +249,7 @@ The current API is served under `/api/v1`. Breaking changes will use `/api/v2`; 
 | `ENABLE_CARDS` | `false` | Optional generic result-card output |
 | `RETRIEVAL_TOP_K` | `6` | Number of vector results retrieved per request |
 | `CARD_MAX_ITEMS` | `5` | Maximum result cards emitted |
-| `CORS_ALLOW_ORIGINS` | `*` | Comma-separated CORS origins |
+| `CORS_ALLOW_ORIGINS` | empty | Comma-separated CORS origins |
 | `LLM_PROVIDER` | `gemini` | LLM factory selection |
 | `LLM_MODEL` | `gemini-2.5-flash` | LLM model name |
 | `GEMINI_API_KEY` | empty | Gemini authentication |
