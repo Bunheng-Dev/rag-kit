@@ -118,11 +118,19 @@ Run the synchronizer manually:
 python scripts/sync_mysql_to_qdrant.py
 ```
 
-Use `--dry-run` to validate the source and report the number of non-empty rows without embedding or writing vectors:
+Use `--dry-run` with `--prune` first to preview deletion candidates. It reads the current MySQL rows and scoped Qdrant IDs, but does not embed, upsert, or delete:
 
 ```bash
-python scripts/sync_mysql_to_qdrant.py --dry-run
+python scripts/sync_mysql_to_qdrant.py --prune --dry-run
 ```
+
+After reviewing the preview, run a scoped prune:
+
+```bash
+python scripts/sync_mysql_to_qdrant.py --prune
+```
+
+Prune only considers points written by this synchronizer for the configured MySQL table. It adds a `sync_source` payload marker to new or re-synced points; points ingested by v0.1.0 without that marker are intentionally not pruned until they are re-synced. The command aborts when MySQL returns no rows, or when more than 50% of scoped points would be deleted. Use `--allow-empty-prune` only when an empty source is intentional, and `--force` only after reviewing a large deletion. `--dry-run` without `--prune` is an error.
 
 For a real local integration test, start the disposable MySQL and self-hosted Qdrant services, then run the opt-in harness:
 
@@ -186,7 +194,7 @@ Detection combines provider-key patterns, credential formats, and a high-entropy
 
 > **Known limitations**: Review these before using rag-kit in production.
 
-- Deleted MySQL rows are **not** pruned from Qdrant. Removed data can still appear in answers. Workaround: delete the collection or the specific points, then re-ingest. A `--prune` option is planned.
+- v0.1.0 MySQL points without the `sync_source` payload marker are not eligible for pruning until they are re-synced.
 - Changing `EMBEDDING_MODEL` or `EMBEDDING_DIM` requires a new collection and full re-ingestion.
 - Synchronization is manual or externally scheduled; there is no automatic sync.
 - Each table or view contributes one configured text column per row.
