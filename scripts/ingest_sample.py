@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.providers.factory import get_datasource_provider
 from app.services.embedder import embedder
 from app.services.vector_service import vector_service
+from app.services.secret_scanner import SecretScanError
 
 
 def main() -> None:
@@ -18,7 +19,11 @@ def main() -> None:
             "DATASOURCE=file python scripts/ingest_sample.py."
         )
 
-    documents = get_datasource_provider().read_documents()
+    try:
+        documents = get_datasource_provider().read_documents()
+    except SecretScanError:
+        print("ERROR: secret scan blocked ingestion; see the value-free findings above.", file=sys.stderr)
+        raise SystemExit(1)
     if not documents:
         raise RuntimeError("The sample dataset is empty")
 

@@ -13,7 +13,7 @@ from app.services.gemini_service import stream_rag_response
 from app.services.vector_service import vector_service
 
 
-router = APIRouter(prefix="/api/chat", tags=["Chat"])
+router = APIRouter(prefix=f"{settings.API_V1_PREFIX}/chat", tags=["Chat"])
 
 
 class ChatRequest(BaseModel):

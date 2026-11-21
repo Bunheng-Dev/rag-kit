@@ -173,7 +173,7 @@ def wait_for_api(process: subprocess.Popen[bytes]) -> None:
 
 def ask(question: str) -> str:
     request = urllib.request.Request(
-        f"{API_URL}/api/chat/stream",
+        f"{API_URL}/api/v1/chat/stream",
         data=json.dumps({"message": question}).encode("utf-8"),
         headers={"Content-Type": "application/json", "X-Chat-API-Key": CHAT_KEY},
         method="POST",
@@ -261,6 +261,7 @@ def main() -> int:
             lambda: ask("What is the nightly price of the product with a swimming pool?"),
         )
         all_passed &= passed
+        print(">> DEBUG answer: ", repr(answer)) 
         if not passed or "120" not in str(answer):
             if passed:
                 print("FAIL: MySQL-only chat answer did not contain the expected keyword (120)")

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = Field(default=8000, validation_alias=AliasChoices("APP_PORT", "PORT"))
+    API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = False
 
     LLM_PROVIDER: str = "gemini"
@@ -50,6 +51,10 @@ class Settings(BaseSettings):
     MYSQL_DOCUMENT_TEXT_COLUMN: str = "text"
     MYSQL_DOCUMENT_METADATA_COLUMNS: str = ""
     SAMPLE_DATA_PATH: str = "data/sample.json"
+
+    SECRET_SCAN_MODE: str = "block"
+    SECRET_SCAN_BLOCKED_COLUMNS: str = "password,passwd,secret,token,api_key,private_key"
+    SECRET_SCAN_ALLOWLIST: str = ""
 
     CHAT_INTERNAL_KEY: str = ""
     ENABLE_CARDS: bool = False
@@ -81,6 +86,18 @@ class Settings(BaseSettings):
         if value <= 0:
             raise ValueError("EMBEDDING_DIM must be greater than zero")
         return value
+
+    @field_validator("SECRET_SCAN_MODE", mode="before")
+    @classmethod
+    def normalize_secret_scan_mode(cls, value: str) -> str:
+        mode = str(value).strip().lower()
+        if mode not in {"block", "redact", "off"}:
+            raise ValueError("SECRET_SCAN_MODE must be block, redact, or off")
+        return mode
+
+    @property
+    def secret_scan_blocked_columns(self) -> set[str]:
+        return {column.strip().lower() for column in self.SECRET_SCAN_BLOCKED_COLUMNS.split(",") if column.strip()}
 
     @property
     def prompt_template_file(self) -> Path:

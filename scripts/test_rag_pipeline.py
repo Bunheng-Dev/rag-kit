@@ -35,7 +35,7 @@ def main() -> None:
     print(f"health: {health}")
 
     try:
-        request_json("/api/chat/stream", {"message": "hello"})
+        request_json("/api/v1/chat/stream", {"message": "hello"})
     except urllib.error.HTTPError as exc:
         assert exc.code == 401
     else:
@@ -43,7 +43,7 @@ def main() -> None:
 
     try:
         request_json(
-            "/api/chat/stream",
+            "/api/v1/chat/stream",
             {"unexpected": True},
             {"X-Chat-API-Key": API_KEY},
         )
@@ -53,7 +53,7 @@ def main() -> None:
         raise AssertionError("invalid payload was not rejected")
 
     request = urllib.request.Request(
-        f"{BASE_URL}/api/chat/stream",
+        f"{BASE_URL}/api/v1/chat/stream",
         data=json.dumps({"message": "What information is available?"}).encode("utf-8"),
         headers={"Content-Type": "application/json", "X-Chat-API-Key": API_KEY},
         method="POST",

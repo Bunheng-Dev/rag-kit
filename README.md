@@ -150,6 +150,23 @@ FROM support_articles;
 
 Configure `MYSQL_DOCUMENT_TABLE=rag_documents`, `MYSQL_DOCUMENT_ID_COLUMN=id`, `MYSQL_DOCUMENT_TEXT_COLUMN=text`, and `MYSQL_DOCUMENT_METADATA_COLUMNS=category,price`.
 
+## Data safety
+
+Ingestion scans document text and metadata before embedding or writing to Qdrant. Set `SECRET_SCAN_MODE` to:
+
+- `block` (default): stop the batch and report only source ID, field, finding type, and count.
+- `redact`: replace detected values with `[REDACTED:<type>]`, then continue and print a value-free summary.
+- `off`: disable the guard; use only when the source is already controlled.
+
+MySQL columns named by `SECRET_SCAN_BLOCKED_COLUMNS` are never selected or ingested. If block mode reports a finding, remove the sensitive value from the source, rotate the exposed credential when appropriate, and re-run ingestion. `scripts/audit_collection.py` scans an existing configured Qdrant collection without printing values:
+
+```bash
+python scripts/audit_collection.py
+python scripts/audit_collection.py --delete  # requires typing DELETE after the report
+```
+
+Detection combines provider-key patterns, credential formats, and a high-entropy heuristic. It is not a guarantee: false positives and misses are possible, so credentials should never be placed in source data at all.
+
 ## Limitations
 
 - Synchronization is manual or externally scheduled; there is no automatic change feed.
@@ -169,17 +186,22 @@ Configure `MYSQL_DOCUMENT_TABLE=rag_documents`, `MYSQL_DOCUMENT_ID_COLUMN=id`, `
 ## API
 
 - `GET /health` returns `online` when Qdrant is ready and `degraded` when startup cannot reach it.
-- `POST /api/chat/stream` streams Server-Sent Events and requires `X-Chat-API-Key`.
+- `GET /api/v1/health` returns the same health payload through the versioned API.
+- `POST /api/v1/chat/stream` streams Server-Sent Events and requires `X-Chat-API-Key`.
 - Result cards are disabled by default. Set `ENABLE_CARDS=true` to emit generic metadata-based cards.
 
 Example:
 
 ```bash
-curl -N http://localhost:8000/api/chat/stream \
+curl -N http://localhost:8000/api/v1/chat/stream \
   -H "Content-Type: application/json" \
   -H "X-Chat-API-Key: $CHAT_INTERNAL_KEY" \
   -d '{"message":"What information is available?"}'
 ```
+
+## API versioning
+
+The current API is served under `/api/v1`. Breaking changes will use `/api/v2`; no breaking changes are introduced within `/api/v1`.
 
 ## Environment variables
 
@@ -189,6 +211,7 @@ curl -N http://localhost:8000/api/chat/stream \
 | `APP_VERSION` | `1.0.0` | API version |
 | `APP_HOST` | `0.0.0.0` | Bind address for local runners |
 | `APP_PORT` | `8000` | Local/API port |
+| `API_V1_PREFIX` | `/api/v1` | Versioned API route prefix |
 | `DEBUG` | `false` | Debug mode toggle |
 | `CHAT_INTERNAL_KEY` | empty | Required chat authentication key |
 | `ENABLE_CARDS` | `false` | Optional generic result-card output |
@@ -217,6 +240,9 @@ curl -N http://localhost:8000/api/chat/stream \
 | `MYSQL_DOCUMENT_ID_COLUMN` | `id` | Source document ID column |
 | `MYSQL_DOCUMENT_TEXT_COLUMN` | `text` | Source document text column |
 | `MYSQL_DOCUMENT_METADATA_COLUMNS` | empty | Comma-separated optional metadata columns |
+| `SECRET_SCAN_MODE` | `block` | Ingestion guard mode: `block`, `redact`, or `off` |
+| `SECRET_SCAN_BLOCKED_COLUMNS` | `password,passwd,secret,token,api_key,private_key` | MySQL columns never ingested |
+| `SECRET_SCAN_ALLOWLIST` | empty | Optional additional allowlist regexes, one per line |
 | `PROMPT_TEMPLATE_PATH` | `prompts/system.txt` | Prompt file path |
 | `PROMPT_TEMPLATE` | empty | Inline prompt override; `{context}` is replaced |
 | `MEDIA_BASE_URL` | empty | Optional media base URL |

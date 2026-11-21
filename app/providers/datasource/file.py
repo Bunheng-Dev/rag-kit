@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import PROJECT_ROOT, settings
+from app.services.secret_scanner import SecretScanError, guard_documents, print_scan_summary
 from .base import DataSourceProvider
 
 
@@ -35,4 +36,11 @@ class FileDataSourceProvider(DataSourceProvider):
             if not isinstance(metadata, dict):
                 raise ValueError(f"Dataset item {index} metadata must be an object")
             documents.append({"id": str(item["id"]), "text": str(item["text"]), "metadata": metadata})
-        return documents
+        records = [(document["id"], document["text"], document["metadata"]) for document in documents]
+        try:
+            guarded, summaries = guard_documents(records)
+        except SecretScanError as exc:
+            print_scan_summary(exc.summaries)
+            raise
+        print_scan_summary(summaries)
+        return [{"id": source_id, "text": text, "metadata": metadata} for source_id, text, metadata in guarded]

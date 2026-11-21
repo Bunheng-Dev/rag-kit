@@ -58,6 +58,7 @@ app.add_middleware(
 app.include_router(chat_router)
 
 @app.get("/health")
+@app.get(f"{settings.API_V1_PREFIX}/health")
 def health_check():
     ready = bool(getattr(app.state, "vector_store_ready", False))
     return {

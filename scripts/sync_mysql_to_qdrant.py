@@ -6,9 +6,7 @@ this script does not assume a particular application schema.
 
 import argparse
 import os
-import re
 import sys
-from collections.abc import Mapping
 from typing import Any
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,63 +15,21 @@ import pymysql
 import pymysql.cursors
 
 from app.core.config import settings
+from app.providers.datasource.mysql import MySQLDataSourceProvider
 from app.providers.factory import get_datasource_provider
+from app.services.secret_scanner import SecretScanError
 from app.services.embedder import embedder
 from app.services.vector_service import vector_service
 
 
 BATCH_SIZE = 32
-IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
 def get_db_connection() -> pymysql.Connection:
     """Connect through the configured datasource provider."""
     return get_datasource_provider().connect()
 
 
-def _identifier(value: str, label: str) -> str:
-    if not IDENTIFIER_RE.fullmatch(value):
-        raise ValueError(f"{label} must be a simple SQL identifier")
-    return value
-
-
-def _metadata_columns() -> list[str]:
-    raw = settings.MYSQL_DOCUMENT_METADATA_COLUMNS
-    return [_identifier(item.strip(), "MYSQL_DOCUMENT_METADATA_COLUMNS") for item in raw.split(",") if item.strip()]
-
-
-def _json_value(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    return str(value)
-
-
 def load_documents(connection: pymysql.Connection) -> list[tuple[str, str, dict[str, Any]]]:
-    table = _identifier(settings.MYSQL_DOCUMENT_TABLE, "MYSQL_DOCUMENT_TABLE")
-    id_column = _identifier(settings.MYSQL_DOCUMENT_ID_COLUMN, "MYSQL_DOCUMENT_ID_COLUMN")
-    text_column = _identifier(settings.MYSQL_DOCUMENT_TEXT_COLUMN, "MYSQL_DOCUMENT_TEXT_COLUMN")
-    metadata_columns = _metadata_columns()
-    selected_columns = ", ".join(dict.fromkeys([id_column, text_column, *metadata_columns]))
-
-    with connection.cursor() as cursor:
-        cursor.execute(f"SELECT {selected_columns} FROM {table};")
-        rows = cursor.fetchall()
-
-    documents: list[tuple[str, str, dict[str, Any]]] = []
-    for row in rows:
-        if not isinstance(row, Mapping):
-            raise ValueError("MySQL datasource must return mapping rows")
-        document_id = row.get(id_column)
-        text = str(row.get(text_column) or "").strip()
-        if document_id is None or not text:
-            continue
-        metadata = {
-            column: _json_value(row.get(column))
-            for column in metadata_columns
-            if row.get(column) is not None
-        }
-        documents.append((str(document_id), text, metadata))
-    return documents
+    return MySQLDataSourceProvider().read_documents(connection)
 
 
 def sync_documents(documents: list[tuple[str, str, dict[str, Any]]]) -> None:
@@ -128,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
             "MYSQL_DOCUMENT_ID_COLUMN, MYSQL_DOCUMENT_TEXT_COLUMN, and metadata columns.",
             file=sys.stderr,
         )
+    except SecretScanError:
+        print("ERROR: secret scan blocked ingestion; see the value-free findings above.", file=sys.stderr)
     except ValueError as exc:
         print(f"ERROR: invalid configuration: {exc}", file=sys.stderr)
     except Exception as exc:

@@ -45,7 +45,7 @@ def get_json(path: str) -> dict:
 
 def ask(question: str) -> str:
     req = urllib.request.Request(
-        f"{BASE_URL}/api/chat/stream",
+        f"{BASE_URL}/api/v1/chat/stream",
         data=json.dumps({"message": question}).encode("utf-8"),
         headers={"Content-Type": "application/json", "X-Chat-API-Key": API_KEY},
         method="POST",

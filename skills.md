@@ -9,7 +9,7 @@ This project is a provider-swappable FastAPI RAG toolkit. Keep provider-specific
 - The default providers are Gemini, Gemini embeddings, Qdrant, and MySQL.
 - Query-time retrieval reads the vector database; MySQL is used by the ingestion adapter.
 - Query and ingestion embeddings must use the same model and `EMBEDDING_DIM`.
-- The API contract is `GET /health` and `POST /api/chat/stream` with SSE output.
+- The API contract is `GET /health` and `POST /api/v1/chat/stream` with SSE output.
 
 ## Engineering rules
 
