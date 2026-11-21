@@ -74,6 +74,12 @@ The API is available at `http://localhost:8000`. If Python runs on the host whil
 
 For a separately running local Qdrant instance, use `QDRANT_URL=http://localhost:6333` and run the API with Python directly.
 
+### Qdrant URL
+
+- Python running on the host: `http://localhost:6333`
+- API running inside Docker Compose: `http://qdrant:6333`
+- Qdrant Cloud: the HTTPS cluster URL and its API key
+
 The bundled sample dataset is [data/sample.json](data/sample.json), and the no-MySQL ingestion command is:
 
 ```bash
@@ -150,6 +156,15 @@ FROM support_articles;
 
 Configure `MYSQL_DOCUMENT_TABLE=rag_documents`, `MYSQL_DOCUMENT_ID_COLUMN=id`, `MYSQL_DOCUMENT_TEXT_COLUMN=text`, and `MYSQL_DOCUMENT_METADATA_COLUMNS=category,price`.
 
+## Security notes
+
+> **Warning**: `CORS_ALLOW_ORIGINS` defaults to permissive access. Developers **MUST** set it to their own frontend domain or domains before production.
+
+- Keep `.env` out of Git and use a strong, rotated `CHAT_INTERNAL_KEY`.
+- Put the API behind HTTPS, use a read-only MySQL account, and keep Qdrant private and authenticated.
+- Keep `SECRET_SCAN_MODE=block`. The scanner is heuristic, not a guarantee. Never place passwords, tokens, or keys in source data.
+- Authentication is one shared API key plus IP-based rate limiting; there are no users, roles, or tenant boundaries.
+
 ## Data safety
 
 Ingestion scans document text and metadata before embedding or writing to Qdrant. Set `SECRET_SCAN_MODE` to:
@@ -167,14 +182,18 @@ python scripts/audit_collection.py --delete  # requires typing DELETE after the 
 
 Detection combines provider-key patterns, credential formats, and a high-entropy heuristic. It is not a guarantee: false positives and misses are possible, so credentials should never be placed in source data at all.
 
-## Limitations
+## Known limitations
 
-- Synchronization is manual or externally scheduled; there is no automatic change feed.
+> **Known limitations**: Review these before using rag-kit in production.
+
+- Deleted MySQL rows are **not** pruned from Qdrant. Removed data can still appear in answers. Workaround: delete the collection or the specific points, then re-ingest. A `--prune` option is planned.
+- Changing `EMBEDDING_MODEL` or `EMBEDDING_DIM` requires a new collection and full re-ingestion.
+- Synchronization is manual or externally scheduled; there is no automatic sync.
 - Each table or view contributes one configured text column per row.
-- Only Gemini LLM/embedding and Qdrant vector providers are currently implemented; MySQL and file are datasource providers.
-- There is no frontend application in this repository.
-- Changing `EMBEDDING_MODEL` or `EMBEDDING_DIM` requires a new compatible collection and full re-ingestion.
-- Deleted MySQL rows are not automatically removed from Qdrant. Run a project-specific reconciliation/deletion job when source deletions must be reflected.
+- Only Gemini and Qdrant providers exist today; MySQL and file are datasource providers.
+- Chat requires Qdrant to be reachable; the API reports degraded health otherwise.
+- There is no frontend or admin UI.
+- `scripts/seed_sample_data.py` is legacy. Use `scripts/ingest_sample.py` or `scripts/sync_mysql_to_qdrant.py`.
 
 ## Production checklist
 

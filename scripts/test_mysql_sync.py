@@ -261,7 +261,6 @@ def main() -> int:
             lambda: ask("What is the nightly price of the product with a swimming pool?"),
         )
         all_passed &= passed
-        print(">> DEBUG answer: ", repr(answer)) 
         if not passed or "120" not in str(answer):
             if passed:
                 print("FAIL: MySQL-only chat answer did not contain the expected keyword (120)")
