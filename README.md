@@ -240,7 +240,7 @@ The current API is served under `/api/v1`. Breaking changes will use `/api/v2`; 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `APP_NAME` | `rag-kit` | Service name |
-| `APP_VERSION` | `1.0.0` | API version |
+| `APP_VERSION` | `0.2.0` | API version |
 | `APP_HOST` | `0.0.0.0` | Bind address for local runners |
 | `APP_PORT` | `8000` | Local/API port |
 | `API_V1_PREFIX` | `/api/v1` | Versioned API route prefix |

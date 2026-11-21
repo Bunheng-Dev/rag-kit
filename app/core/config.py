@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     APP_NAME: str = "rag-kit"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "0.2.0"
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = Field(default=8000, validation_alias=AliasChoices("APP_PORT", "PORT"))
     API_V1_PREFIX: str = "/api/v1"
